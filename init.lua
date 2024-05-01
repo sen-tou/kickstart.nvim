@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -165,7 +165,16 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = 'Go to previous [D]iagnostic message' })
 vim.keymap.set('n', ']d', vim.diagnostic.goto_next, { desc = 'Go to next [D]iagnostic message' })
 vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, { desc = 'Show diagnostic [E]rror messages' })
-vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
+vim.keymap.set('n', '<leader>qq', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
+local function quickfix()
+  vim.lsp.buf.code_action {
+    filter = function(a)
+      return a.isPreferred
+    end,
+    apply = true,
+  }
+end
+vim.keymap.set('n', '<leader>qf', quickfix, { desc = 'Try auto fix' })
 
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
@@ -288,6 +297,8 @@ require('lazy').setup({
         ['<leader>w'] = { name = '[W]orkspace', _ = 'which_key_ignore' },
         ['<leader>t'] = { name = '[T]oggle', _ = 'which_key_ignore' },
         ['<leader>h'] = { name = 'Git [H]unk', _ = 'which_key_ignore' },
+        ['<leader>l'] = { name = '[L]int', _ = 'which_key_ignore' },
+        ['<leader>q'] = { name = '[Q]uickfix', _ = 'which_key_ignore' },
       }
       -- visual mode
       require('which-key').register({
@@ -353,11 +364,13 @@ require('lazy').setup({
         -- You can put your default mappings / updates / etc. in here
         --  All the info you're looking for is in `:help telescope.setup()`
         --
-        -- defaults = {
-        --   mappings = {
-        --     i = { ['<c-enter>'] = 'to_fuzzy_refine' },
-        --   },
-        -- },
+        defaults = {
+          mappings = {
+            i = {
+              ['<esc>'] = require('telescope.actions').close,
+            },
+          },
+        },
         -- pickers = {}
         extensions = {
           ['ui-select'] = {
@@ -578,6 +591,7 @@ require('lazy').setup({
         -- tsserver = {},
         --
 
+        phpactor = {},
         lua_ls = {
           -- cmd = {...},
           -- filetypes = { ...},
@@ -606,7 +620,9 @@ require('lazy').setup({
       -- for you, so that they are available from within Neovim.
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
-        'stylua', -- Used to format Lua code
+        'stylua',
+        'phpstan',
+        'php-cs-fixer',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -639,7 +655,7 @@ require('lazy').setup({
       },
     },
     opts = {
-      notify_on_error = false,
+      notify_on_error = true,
       format_on_save = function(bufnr)
         -- Disable "format_on_save lsp_fallback" for languages that don't
         -- have a well standardized coding style. You can add additional
@@ -647,17 +663,30 @@ require('lazy').setup({
         local disable_filetypes = { c = true, cpp = true }
         return {
           timeout_ms = 500,
+          async = true,
           lsp_fallback = not disable_filetypes[vim.bo[bufnr].filetype],
         }
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
+        php = { 'php', 'php-cs-fixer' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
         -- You can use a sub-list to tell conform to run *until* a formatter
         -- is found.
         -- javascript = { { "prettierd", "prettier" } },
+      },
+      formatters = {
+        ['php-cs-fixer'] = {
+          command = 'php-cs-fixer',
+          args = {
+            'fix',
+            '--rules=@Symfony', -- Formatting preset. Other presets are available, see the php-cs-fixer docs.
+            '$FILENAME',
+          },
+          stdin = false,
+        },
       },
     },
   },
@@ -835,7 +864,7 @@ require('lazy').setup({
     'nvim-treesitter/nvim-treesitter',
     build = ':TSUpdate',
     opts = {
-      ensure_installed = { 'bash', 'c', 'html', 'lua', 'luadoc', 'markdown', 'vim', 'vimdoc' },
+      ensure_installed = { 'bash', 'c', 'html', 'lua', 'luadoc', 'markdown', 'vim', 'vimdoc', 'php' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
@@ -875,7 +904,7 @@ require('lazy').setup({
   --
   -- require 'kickstart.plugins.debug',
   -- require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.lint',
   -- require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
   -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
